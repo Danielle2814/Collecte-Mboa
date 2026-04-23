@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title> MboaTest - Profil Culinaire Étudiant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>MboaTest</h1>
+            <p class="subtitle">Dis-moi TOUT sur ce que tu manges. Promis, ça reste entre nous.</p>
+            <p style="font-size: 0.8rem; color: #999;">3 minutes chrono</p>
+        </header>
+
+        <form id="sondage-form">
+
+            <!-- SECTION 1 : LOGISTIQUE -->
+            <div class="section-title"> TA CUISINE (ou ce qui y ressemble)</div>
+
+            <div class="card">
+                <h2>Dans ta chambre/studio, t'as quoi ?</h2>
+                <p class="question-hint">Coche TOUT ce que tu possèdes VRAIMENT.</p>
+                <div class="checkbox-group" id="equipement-group">
+                    <label class="btn-checkbox"><input type="checkbox" name="equipement" value="plaque_unique"> Une seule plaque (électrique/gaz)</label>
+                    <label class="btn-checkbox"><input type="checkbox" name="equipement" value="frigo"> Un réfrigérateur</label>
+                    <label class="btn-checkbox"><input type="checkbox" name="equipement" value="congelateur"> Un congélateur qui marche</label>
+                    <label class="btn-checkbox"><input type="checkbox" name="equipement" value="micro_ondes"> Un micro-ondes</label>
+                    <label class="btn-checkbox"><input type="checkbox" name="equipement" value="mixeur"> Un mixeur/blender</label>
+                    <label class="btn-checkbox"><input type="checkbox" name="equipement" value="rien"> Rien, juste une bouilloire 🥲</label>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Ton frigo, il est comment ?</h2>
+                <select id="frigo-vide" class="select-big">
+                    <option value="1">Toujours plein, je gère</option>
+                    <option value="2">Vide à partir de Jeudi</option>
+                    <option value="3" selected>Toujours vide, j'achète au jour le jour</option>
+                    <option value="4">J'ai pas de frigo du tout</option>
+                </select>
+            </div>
+
+            <!-- SECTION 2 : LE RÉEL -->
+            <div class="section-title"> TON VRAI QUOTIDIEN</div>
+
+            <div class="card">
+                <h2>Qu'as-tu mangé ces 3 derniers jours ?</h2>
+                <p class="question-hint">Sois honnête, on juge pas. Ex: "Lundi soir: pain-omelette, Mardi midi: riz-sauce tomate..."</p>
+                <textarea id="repas-3-jours" class="text-input-big textarea-big" rows="4" placeholder="Décris vite fait..."></textarea>
+            </div>
+
+            <div class="card">
+                <h2>Quel est le plat que tu manges TOUT LE TEMPS et qui commence à te sortir par les narines ?</h2>
+                <p class="question-hint">Celui que tu ne peux plus voir en photo.</p>
+                <input type="text" id="plat-saoulant" class="text-input-big" placeholder="Ex: Les spaghettis sans rien, le riz blanc sec...">
+            </div>
+
+            <div class="card">
+                <h2>Quand t'as la flemme MAX, tu manges quoi ?</h2>
+                <p class="question-hint">Le truc que tu prépares en mode zombie, sans réfléchir.</p>
+                <input type="text" id="repas-flemme" class="text-input-big" placeholder="Ex: Indomie, omelette-pain, sardine-avocat, céréales...">
+            </div>
+
+            <!-- SECTION 3 : LE BUDGET -->
+            <div class="section-title"> LE PORTE-MONNAIE</div>
+
+            <div class="card">
+                <h2>Combien max tu peux mettre pour UN SEUL repas maison ?</h2>
+                <div class="btn-group-vertical" id="budget-group">
+                    <button type="button" data-budget="500" class="btn-choice"> 300-500 FCFA (Pain + omelette)</button>
+                    <button type="button" data-budget="1000" class="btn-choice active"> 500-1000 FCFA (Petit plat modeste)</button>
+                    <button type="button" data-budget="2000" class="btn-choice"> 1000-2000 FCFA (Je peux ajouter viande/poisson)</button>
+                    <button type="button" data-budget="3000" class="btn-choice"> 2000+ FCFA (Aujourd'hui on mange bien)</button>
+                </div>
+                <input type="hidden" id="budget-input" name="budget_max" value="1000">
+            </div>
+
+            <div class="card">
+                <h2> T'as TOUJOURS quoi dans ton placard ?</h2>
+                <p class="question-hint">Les ingrédients qui ne manquent JAMAIS, même en fin de mois.</p>
+                <input type="text" id="ingredients-input" class="text-input-big" placeholder="Ex: Sardine, Oignon, Riz, Pâtes, Œufs, Tapioca...">
+            </div>
+
+            <!-- SECTION 4 : COMPÉTENCES -->
+            <div class="section-title"> TES SKILLS EN CUISINE</div>
+
+            <div class="card">
+                <h2>Quels plats es-tu capable de BIEN cuisiner ?</h2>
+                <p class="question-hint">Ceux que tu peux faire sans tuto, sans appeler maman.</p>
+                <textarea id="plats-capable" class="text-input-big textarea-big" rows="3" placeholder="Ex: Riz sauté, omelette, poulet DG simple, sauce tomate, ndolé..."></textarea>
+            </div>
+
+            <div class="card">
+                <h2>Combien de temps MAX tu acceptes de rester debout devant ta cuisine pour UN SEUL plat ?</h2>
+                <select id="temps-max" class="select-big">
+                    <option value="15">15 min (Instantané, j'ai faim là maintenant)</option>
+                    <option value="30" selected>30 min (Rapide mais correct)</option>
+                    <option value="60">1h (J'ai le temps ce week-end)</option>
+                    <option value="120">Plus d'1h (Je veux impressionner quelqu'un)</option>
+                </select>
+            </div>
+
+            <div class="card">
+                <h2> Quelle est ta plus grande PEUR en cuisine ?</h2>
+                <div class="radio-group">
+                    <label class="btn-checkbox"><input type="radio" name="peur" value="rater_cuisson" checked> Rater la cuisson (viande dure, poisson pas cuit)</label>
+                    <label class="btn-checkbox"><input type="radio" name="peur" value="gachis"> Gâcher les ingrédients (jeter la bouffe = jeter l'argent)</label>
+                    <label class="btn-checkbox"><input type="radio" name="peur" value="vaisselle"> La vaisselle à faire après</label>
+                    <label class="btn-checkbox"><input type="radio" name="peur" value="temps"> Passer 2h pour un résultat dégueulasse</label>
+                </div>
+            </div>
+
+            <!-- SECTION 5 : SENSORIEL & NOSTALGIE -->
+            <div class="section-title"> ÉMOTIONS & SOUVENIRS</div>
+
+            <div class="card">
+                <h2>Quelle ODEUR de nourriture te rappelle le plus la MAISON ?</h2>
+                <p class="question-hint">L'odeur qui te fait dire "Han, c'est comme chez maman ça".</p>
+                <input type="text" id="odeur-maison" class="text-input-big" placeholder="Ex: Le poisson braisé fumé, le riz qui chauffe avec l'ail, la sauce arachide qui mijote...">
+            </div>
+
+            <div class="card">
+                <h2>Quelle odeur te fait le plus baver quand tu marches dans la rue ?</h2>
+                <p class="question-hint">L'odeur qui te fait tourner la tête direct.</p>
+                <select id="odeur-select" class="select-big">
+                    <option value="friture_poisson">Le poisson en train de frire dans l'huile </option>
+                    <option value="oignon_ail">L'oignon, l'ail, le gingembre qui sautent </option>
+                    <option value="viande_braisee">La viande braisée/grillée </option>
+                    <option value="sauce_arachide">La sauce arachide/pistache qui mijote </option>
+                    <option value="beignets">Les beignets qui dorent </option>
+                </select>
+            </div>
+
+            <!-- SECTION 6 : ASPIRATIONS -->
+            <div class="section-title">TES ENVIES CACHÉES</div>
+
+            <div class="card">
+                <h2>Si MboaChef était un Application dans ton téléphone, tu voudrais qu'il te dise quoi ?</h2>
+                <select id="genie-choix" class="select-big">
+                    <option value="rapide">"T'as 15 minutes et une plaque, voici un VRAI plat sans vaisselle"</option>
+                    <option value="economique">"Ce mois-ci t'es fauché ? Voici 5 recettes avec juste des œufs et du cube"</option>
+                    <option value="seduction">"Tu veux inviter quelqu'un ? Voici comment faire genre tu sais cuisiner"</option>
+                    <option value="nostalgie">"Maman t'as envoyé du ndomba congelé ? Voilà comment pas gâcher ça"</option>
+                </select>
+            </div>
+
+            <button type="submit" id="submit-btn" class="submit-btn">Envoyer mon profil culinaire</button>
+            <div id="form-message" class="message"></div>
+        </form>
+        
+        <div class="dashboard-link">
+            <a href="./dashboard.html">Voir ce que les autres étudiants mangent</a>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

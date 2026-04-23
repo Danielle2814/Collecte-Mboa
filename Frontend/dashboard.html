@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MboaData - Dashboard Complet</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <div class="dashboard-title">
+            <h1> MboaData</h1>
+            <p>Ce que les étudiants mangent VRAIMENT</p>
+        </div>
+
+        <!-- KPIs -->
+        <div class="kpi-container">
+            <div class="kpi-card">
+                <div class="kpi-number" id="total-reponses">--</div>
+                <div class="kpi-label">Cobayes </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-number" id="budget-moyen">--</div>
+                <div class="kpi-label">Budget moyen/repas </div>
+            </div>
+        </div>
+
+        <!-- Insights -->
+        <div class="insight-box" id="insight-box">Chargement...</div>
+
+        <!-- TOP 5 : Plats saoulants -->
+        <div class="chart-card">
+            <div class="chart-title"> Top 5 "Plats qui sortent par les narines"</div>
+            <div class="chart-container"><canvas id="platSaoulantChart"></canvas></div>
+        </div>
+
+        <!-- TOP 5 : Repas flemme -->
+        <div class="chart-card">
+            <div class="chart-title"> Top 5 "Repas flemme max"</div>
+            <div class="chart-container"><canvas id="repasFlemmeChart"></canvas></div>
+        </div>
+
+        <!-- Odeurs préférées (Camembert) -->
+        <div class="chart-card">
+            <div class="chart-title"> Odeur qui donne le plus faim</div>
+            <div class="chart-container"><canvas id="odeurChart"></canvas></div>
+        </div>
+
+        <!-- Grille 2 colonnes -->
+        <div class="grid-2-charts">
+            <div class="chart-card">
+                <div class="chart-title"> Équipement dispo</div>
+                <div class="chart-container"><canvas id="equipementChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title"> Hantise en cuisine</div>
+                <div class="chart-container"><canvas id="peurChart"></canvas></div>
+            </div>
+        </div>
+
+        <!-- Budget -->
+        <div class="chart-card">
+            <div class="chart-title"> Budget par repas</div>
+            <div class="chart-container"><canvas id="budgetChart"></canvas></div>
+        </div>
+
+        <!-- Nuage de mots : Odeur maison -->
+        <div class="mots-box">
+            <div class="chart-title"> Odeurs qui rappellent la maison</div>
+            <div id="odeurs-maison-container">Chargement...</div>
+        </div>
+
+        <div class="retour-link"><a href="./index.html">← Retour au questionnaire</a></div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
