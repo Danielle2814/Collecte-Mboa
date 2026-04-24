@@ -62,6 +62,190 @@ function renderLocalResponse() {
     container.innerHTML = lines.length ? lines.join('') : '<p>Aucune réponse locale détaillée.</p>';
 }
 
+function getLocalResponses() {
+    const pending = JSON.parse(localStorage.getItem(LOCAL_PENDING_KEY) || '[]').map(item => item.payload || {});
+    const last = getLastResponse();
+    const current = [];
+    if (last && last.payload) {
+        current.push(last.payload);
+    }
+    return [...current, ...pending];
+}
+
+function buildOfflineStats(responses) {
+    const labelMap = {
+        'friture_poisson': 'Poisson Frit', 'oignon_ail': 'Oignon/Ail',
+        'viande_braisee': 'Viande Braisée', 'sauce_arachide': 'Sauce Arachide',
+        'beignets': 'Beignets'
+    };
+
+    const equipements = { 'Plaque unique': 0, 'Frigo': 0, 'Micro-ondes': 0, 'Rien du tout': 0 };
+    const budgetRanges = { '0-500 FCFA': 0, '501-1000 FCFA': 0, '1001-2000 FCFA': 0, '2000+ FCFA': 0 };
+    const peurs = {};
+    const odeurs = {};
+    const platsSaoulants = {};
+    const repasFlemme = {};
+    const odeursMaison = [];
+    let budgetTotal = 0;
+
+    responses.forEach(payload => {
+        const eq = payload.equipement || [];
+        if (Array.isArray(eq)) {
+            eq.forEach(value => {
+                if (value.includes('plaque')) equipements['Plaque unique'] += 1;
+                if (value.includes('frigo')) equipements['Frigo'] += 1;
+                if (value.includes('micro_ondes') || value.includes('micro')) equipements['Micro-ondes'] += 1;
+                if (value === 'rien') equipements['Rien du tout'] += 1;
+            });
+        }
+
+        const budget = parseInt(payload.budget_max, 10) || 0;
+        budgetTotal += budget;
+        if (budget <= 500) budgetRanges['0-500 FCFA'] += 1;
+        else if (budget <= 1000) budgetRanges['501-1000 FCFA'] += 1;
+        else if (budget <= 2000) budgetRanges['1001-2000 FCFA'] += 1;
+        else budgetRanges['2000+ FCFA'] += 1;
+
+        const peur = payload.peur_cuisine;
+        if (peur) peurs[peur] = (peurs[peur] || 0) + 1;
+
+        const odeur = payload.odeur_preferee;
+        if (odeur) odeurs[odeur] = (odeurs[odeur] || 0) + 1;
+
+        const plat = payload.plat_saoulant;
+        if (plat) platsSaoulants[plat] = (platsSaoulants[plat] || 0) + 1;
+
+        const flemme = payload.repas_flemme;
+        if (flemme) repasFlemme[flemme] = (repasFlemme[flemme] || 0) + 1;
+
+        const odeurMaison = payload.odeur_maison;
+        if (odeurMaison) odeursMaison.push(odeurMaison);
+    });
+
+    const total = responses.length;
+    return {
+        total_reponses: total,
+        budget_moyen: total ? Math.round((budgetTotal / total) * 100) / 100 : 0,
+        odeurs: {
+            labels: Object.keys(odeurs).map(k => labelMap[k] || k),
+            data: Object.values(odeurs),
+            backgroundColor: Object.keys(odeurs).map((_, index) => ['#E74C3C', '#F39C12', '#C0392B', '#D35400', '#F1C40F'][index % 5])
+        },
+        equipement: {
+            labels: Object.keys(equipements),
+            data: Object.values(equipements),
+            backgroundColor: ['#3498DB', '#2ECC71', '#9B59B6', '#E74C3C']
+        },
+        budget_detail: {
+            labels: Object.keys(budgetRanges),
+            data: Object.values(budgetRanges),
+            backgroundColor: '#E67E22'
+        },
+        peurs: {
+            labels: Object.keys(peurs).map(k => {
+                const map = {
+                    'rater_cuisson': 'Rater la cuisson', 'gachis': 'Gâcher ingrédients',
+                    'vaisselle': 'Trop de vaisselle', 'temps': 'Perdre 2h'
+                };
+                return map[k] || k;
+            }),
+            data: Object.values(peurs),
+            backgroundColor: ['#E74C3C', '#F1C40F', '#3498DB', '#9B59B6'].slice(0, Object.keys(peurs).length)
+        },
+        plats_saoulants: {
+            labels: Object.keys(platsSaoulants),
+            data: Object.values(platsSaoulants)
+        },
+        repas_flemme: {
+            labels: Object.keys(repasFlemme),
+            data: Object.values(repasFlemme)
+        },
+        odeurs_maison: odeursMaison.slice(0, 10)
+    };
+}
+
+function renderCharts(data) {
+    if (!document.getElementById('insight-box')) return;
+
+    const box = document.getElementById('insight-box');
+    box.innerHTML = '';
+    const insights = [];
+    if (data.total_reponses > 0) {
+        if (data.plats_saoulants.labels.length) insights.push(`Plat le plus détesté : <strong>${data.plats_saoulants.labels[0]}</strong> (${data.plats_saoulants.data[0]} vote(s))`);
+        if (data.repas_flemme.labels.length) insights.push(`Flemme ultime : <strong>${data.repas_flemme.labels[0]}</strong>`);
+    } else {
+        insights.push(' Aucune donnée. Remplis le questionnaire !');
+    }
+    box.innerHTML = insights.join('<br>');
+
+    document.getElementById('total-reponses').textContent = data.total_reponses;
+    document.getElementById('budget-moyen').textContent = data.budget_moyen.toLocaleString();
+
+    destroyChart('platSaoulant');
+    destroyChart('repasFlemme');
+    destroyChart('odeur');
+    destroyChart('equipement');
+    destroyChart('peur');
+    destroyChart('budget');
+
+    const ctx1 = document.getElementById('platSaoulantChart')?.getContext('2d');
+    if (ctx1) {
+        charts['platSaoulant'] = new Chart(ctx1, {
+            type: 'bar', data: { labels: data.plats_saoulants.labels, datasets: [{ data: data.plats_saoulants.data, backgroundColor: '#E74C3C', borderRadius: 8 }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    const ctx2 = document.getElementById('repasFlemmeChart')?.getContext('2d');
+    if (ctx2) {
+        charts['repasFlemme'] = new Chart(ctx2, {
+            type: 'bar', data: { labels: data.repas_flemme.labels, datasets: [{ data: data.repas_flemme.data, backgroundColor: '#F39C12', borderRadius: 8 }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    const ctx3 = document.getElementById('odeurChart')?.getContext('2d');
+    if (ctx3) {
+        charts['odeur'] = new Chart(ctx3, {
+            type: 'pie', data: { labels: data.odeurs.labels, datasets: [{ data: data.odeurs.data, backgroundColor: data.odeurs.backgroundColor }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    const ctx4 = document.getElementById('equipementChart')?.getContext('2d');
+    if (ctx4) {
+        charts['equipement'] = new Chart(ctx4, {
+            type: 'bar', data: { labels: data.equipement.labels, datasets: [{ data: data.equipement.data, backgroundColor: data.equipement.backgroundColor, borderRadius: 8 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    const ctx5 = document.getElementById('peurChart')?.getContext('2d');
+    if (ctx5) {
+        charts['peur'] = new Chart(ctx5, {
+            type: 'doughnut', data: { labels: data.peurs.labels, datasets: [{ data: data.peurs.data, backgroundColor: data.peurs.backgroundColor }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    const ctx6 = document.getElementById('budgetChart')?.getContext('2d');
+    if (ctx6) {
+        charts['budget'] = new Chart(ctx6, {
+            type: 'bar', data: { labels: data.budget_detail.labels, datasets: [{ data: data.budget_detail.data, backgroundColor: '#E67E22', borderRadius: 8 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    const container = document.getElementById('odeurs-maison-container');
+    if (container) {
+        if (data.odeurs_maison && data.odeurs_maison.length > 0) {
+            container.innerHTML = data.odeurs_maison.map(o => `<span class="mot-tag"> ${o}</span>`).join('');
+        } else {
+            container.innerHTML = '<p>Aucune réponse pour l\'instant.</p>';
+        }
+    }
+}
+
 async function trySendPendingSubmissions() {
     const pending = JSON.parse(localStorage.getItem('mboa_pending_submissions') || '[]');
     if (!pending.length) return;
@@ -326,12 +510,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 
             } catch (error) {
                 console.error(error);
-                document.getElementById('insight-box').innerHTML = ' Serveur injoignable. Lance "python backend/app.py" !';
+                const insightBox = document.getElementById('insight-box');
+                if (insightBox) insightBox.innerHTML = ' Serveur injoignable. Les graphiques ci-dessous sont basés sur ta dernière réponse locale.';
                 const container = document.getElementById('odeurs-maison-container');
                 if (container) container.innerHTML = '<p>Pas de données serveurs disponibles.</p>';
+                const offlineData = buildOfflineStats(getLocalResponses());
+                renderCharts(offlineData);
                 renderLocalResponse();
             }
         }
         
-        loadStats();
-        setInterval(loadStats, 30000);
+        const dashboardElement = document.getElementById('insight-box');
+        if (dashboardElement) {
+            loadStats();
+            setInterval(loadStats, 30000);
+        }
