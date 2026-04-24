@@ -1,3 +1,92 @@
+const API_SONDAGE = '/api/sondage';
+const API_STATS = '/api/stats';
+const LOCAL_PENDING_KEY = 'mboa_pending_submissions';
+const LOCAL_LAST_RESPONSE_KEY = 'mboa_last_response';
+
+function savePendingSubmission(payload) {
+    const pending = JSON.parse(localStorage.getItem(LOCAL_PENDING_KEY) || '[]');
+    pending.push({ payload, date: new Date().toISOString() });
+    localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pending));
+}
+
+function saveLastResponse(payload, status = 'success') {
+    const stored = {
+        payload,
+        status,
+        date: new Date().toISOString()
+    };
+    localStorage.setItem(LOCAL_LAST_RESPONSE_KEY, JSON.stringify(stored));
+}
+
+function getLastResponse() {
+    return JSON.parse(localStorage.getItem(LOCAL_LAST_RESPONSE_KEY) || 'null');
+}
+
+function renderLocalResponse() {
+    const container = document.getElementById('local-response-container');
+    if (!container) return;
+
+    const stored = getLastResponse();
+    if (!stored) {
+        container.innerHTML = '<p>Aucune réponse locale détectée.</p>';
+        return;
+    }
+
+    const payload = stored.payload || {};
+    const status = stored.status === 'success' ? 'Envoyée / enregistrée' : 'En attente d’envoi';
+    const date = new Date(stored.date).toLocaleString();
+
+    const lines = [];
+    function addLine(label, value) {
+        if (value === undefined || value === null || value === '') return;
+        if (Array.isArray(value) && value.length === 0) return;
+        lines.push(`<div><strong>${label} :</strong> ${Array.isArray(value) ? value.join(', ') : value}</div>`);
+    }
+
+    addLine('Date', date);
+    addLine('Statut', status);
+    addLine('Équipement', payload.equipement);
+    addLine('Frigo vide', payload.frigo_vide);
+    addLine('Repas 3 jours', payload.repas_3_jours);
+    addLine('Plat saoulant', payload.plat_saoulant);
+    addLine('Repas flemme', payload.repas_flemme);
+    addLine('Budget max', payload.budget_max);
+    addLine('Ingrédients phares', payload.ingredients_phares);
+    addLine('Plats capable', payload.plats_capable);
+    addLine('Temps max', payload.temps_max);
+    addLine('Peur cuisine', payload.peur_cuisine);
+    addLine('Odeur maison', payload.odeur_maison);
+    addLine('Odeur préférée', payload.odeur_preferee);
+    addLine('Genie choix', payload.genie_choix);
+
+    container.innerHTML = lines.length ? lines.join('') : '<p>Aucune réponse locale détaillée.</p>';
+}
+
+async function trySendPendingSubmissions() {
+    const pending = JSON.parse(localStorage.getItem('mboa_pending_submissions') || '[]');
+    if (!pending.length) return;
+
+    const remaining = [];
+    for (const item of pending) {
+        try {
+            const response = await fetch(API_SONDAGE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item.payload)
+            });
+            if (response.ok) {
+                saveLastResponse(item.payload, 'success');
+            } else {
+                remaining.push(item);
+            }
+        } catch (err) {
+            remaining.push(item);
+        }
+    }
+
+    localStorage.setItem('mboa_pending_submissions', JSON.stringify(remaining));
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     
     // === ANTI-DOUBLON COOKIE ===
@@ -23,18 +112,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // === GESTION BUDGET ===
-    const budgetBtns = document.querySelectorAll('#budget-group .btn-choice');
-    const budgetInput = document.getElementById('budget-input');
-    
-    budgetBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            budgetBtns.forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            budgetInput.value = this.dataset.budget;
-        });
-    });
-
     // === GESTION CHECKBOX "RIEN" (exclusif) ===
     const checkboxes = document.querySelectorAll('input[name="equipement"]');
     const rienCheckbox = Array.from(checkboxes).find(cb => cb.value === 'rien');
@@ -60,92 +137,112 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageDiv = document.getElementById('form-message');
     const submitBtn = document.getElementById('submit-btn');
 
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        submitBtn.disabled = true;
-        submitBtn.textContent = ' Envoi en cours...';
-        messageDiv.textContent = '';
-        messageDiv.style.color = '#27AE60';
+    if (form) {
+        const budgetBtns = document.querySelectorAll('#budget-group .btn-choice');
+        const budgetInput = document.getElementById('budget-input');
 
-        // Récupération équipement
-        const equipementChecked = Array.from(
-            document.querySelectorAll('input[name="equipement"]:checked')
-        ).map(cb => cb.value);
-
-        // Récupération peur
-        let peur = '';
-        document.querySelectorAll('input[name="peur"]').forEach(r => {
-            if (r.checked) peur = r.value;
+        budgetBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                budgetBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                budgetInput.value = this.dataset.budget;
+            });
         });
 
-        // Construction du payload COMPLET
-        const payload = {
-            // Logistique
-            equipement: equipementChecked,
-            frigo_vide: document.getElementById('frigo-vide').value,
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
             
-            // Quotidien réel
-            repas_3_jours: document.getElementById('repas-3-jours').value.trim(),
-            plat_saoulant: document.getElementById('plat-saoulant').value.trim(),
-            repas_flemme: document.getElementById('repas-flemme').value.trim(),
-            
-            // Budget
-            budget_max: parseInt(budgetInput.value),
-            ingredients_phares: document.getElementById('ingredients-input').value.trim(),
-            
-            // Compétences
-            plats_capable: document.getElementById('plats-capable').value.trim(),
-            temps_max: document.getElementById('temps-max').value,
-            peur_cuisine: peur,
-            
-            // Sensoriel
-            odeur_maison: document.getElementById('odeur-maison').value.trim(),
-            odeur_preferee: document.getElementById('odeur-select').value,
-            
-            // Aspiration
-            genie_choix: document.getElementById('genie-choix').value
-        };
+            submitBtn.disabled = true;
+            submitBtn.textContent = ' Envoi en cours...';
+            messageDiv.textContent = '';
+            messageDiv.style.color = '#27AE60';
 
-        console.log("📤 Envoi du payload :", payload);
+            // Récupération équipement
+            const equipementChecked = Array.from(
+                document.querySelectorAll('input[name="equipement"]:checked')
+            ).map(cb => cb.value);
 
-        try {
-            const response = await fetch('http://localhost:5000/api/sondage', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+            // Récupération peur
+            let peur = '';
+            document.querySelectorAll('input[name="peur"]').forEach(r => {
+                if (r.checked) peur = r.value;
             });
 
-            const result = await response.json();
-            
-            if (response.status === 429) {
-                // IP bloquée
-                messageDiv.textContent = result.message;
-                messageDiv.style.color = '#E67E22';
-                return;
+            // Construction du payload COMPLET
+            const payload = {
+                // Logistique
+                equipement: equipementChecked,
+                frigo_vide: document.getElementById('frigo-vide').value,
+                
+                // Quotidien réel
+                repas_3_jours: document.getElementById('repas-3-jours').value.trim(),
+                plat_saoulant: document.getElementById('plat-saoulant').value.trim(),
+                repas_flemme: document.getElementById('repas-flemme').value.trim(),
+                
+                // Budget
+                budget_max: parseInt(budgetInput.value),
+                ingredients_phares: document.getElementById('ingredients-input').value.trim(),
+                
+                // Compétences
+                plats_capable: document.getElementById('plats-capable').value.trim(),
+                temps_max: document.getElementById('temps-max').value,
+                peur_cuisine: peur,
+                
+                // Sensoriel
+                odeur_maison: document.getElementById('odeur-maison').value.trim(),
+                odeur_preferee: document.getElementById('odeur-select').value,
+                
+                // Aspiration
+                genie_choix: document.getElementById('genie-choix').value
+            };
+
+            console.log(" Envoi du payload :", payload);
+
+            try {
+                const response = await fetch(API_SONDAGE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                
+                if (response.status === 429) {
+                    // IP bloquée
+                    messageDiv.textContent = result.message;
+                    messageDiv.style.color = '#E67E22';
+                    return;
+                }
+                
+                if (response.ok) {
+                    //  SUCCÈS
+                    localStorage.setItem(HAS_VOTED_KEY, 'true');
+                    saveLastResponse(payload, 'success');
+                    messageDiv.textContent = ' Merci ! Ton profil est enregistré. Va voir le dashboard !';
+                    messageDiv.style.color = '#27AE60';
+                    form.reset();
+                    budgetBtns.forEach(b => b.classList.remove('active'));
+                    const defaultBudget = document.querySelector('[data-budget="1000"]');
+                    if (defaultBudget) defaultBudget.classList.add('active');
+                } else {
+                    throw new Error(result.message || 'Erreur serveur');
+                }
+            } catch (error) {
+                console.error(' Erreur:', error);
+                saveLastResponse(payload, 'pending');
+                savePendingSubmission(payload);
+                messageDiv.textContent = 'Connexion impossible. Ta réponse est sauvegardée localement et sera renvoyée dès que possible.';
+                messageDiv.style.color = '#E74C3C';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = ' Envoyer mon profil culinaire';
             }
-            
-            if (response.ok) {
-                //  SUCCÈS
-                localStorage.setItem(HAS_VOTED_KEY, 'true');
-                messageDiv.textContent = ' Merci ! Ton profil est enregistré. Va voir le dashboard !';
-                messageDiv.style.color = '#27AE60';
-                form.reset();
-                budgetBtns.forEach(b => b.classList.remove('active'));
-                const defaultBudget = document.querySelector('[data-budget="1000"]');
-                if (defaultBudget) defaultBudget.classList.add('active');
-            } else {
-                throw new Error(result.message || 'Erreur serveur');
-            }
-        } catch (error) {
-            console.error(' Erreur:', error);
-            messageDiv.textContent = ' Erreur réseau. Vérifie ta connexion et réessaie.';
-            messageDiv.style.color = '#E74C3C';
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = ' Envoyer mon profil culinaire';
-        }
-    });
+        });
+    }
+
+    trySendPendingSubmissions();
+    window.addEventListener('online', trySendPendingSubmissions);
+    renderLocalResponse();
 });
 
 // JS Dashboard
@@ -158,7 +255,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         async function loadStats() {
             try {
-                const response = await fetch('http://localhost:5000/api/stats');
+                const response = await fetch(API_STATS);
                 const data = await response.json();
                 
                 document.getElementById('total-reponses').textContent = data.total_reponses;
@@ -230,6 +327,9 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 console.error(error);
                 document.getElementById('insight-box').innerHTML = ' Serveur injoignable. Lance "python backend/app.py" !';
+                const container = document.getElementById('odeurs-maison-container');
+                if (container) container.innerHTML = '<p>Pas de données serveurs disponibles.</p>';
+                renderLocalResponse();
             }
         }
         

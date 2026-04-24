@@ -74,8 +74,15 @@ MboaCollect/
    python Backend/app.py
    ```
 
-5. **Accéder à l'application**
+5. **Accéder à l'application sur un ordinateur**
    - Ouvrez votre navigateur et allez à `http://localhost:5000`
+
+6. **Accéder à l'application sur un téléphone**
+   - Si le backend est lancé sur un PC, mettez le téléphone et le PC sur le même réseau Wi-Fi.
+   - Trouvez l'adresse IP du PC (exemple : `192.168.1.100`).
+   - Ouvrez sur le téléphone : `http://192.168.1.100:5000`
+   - N'utilisez pas `file://` pour ouvrir `index.html`, le backend doit être accessible par HTTP.
+   - Si l'API n'est pas accessible, la réponse peut être sauvegardée localement sur le téléphone et renvoyée plus tard.
 
 ---
 
