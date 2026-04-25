@@ -4,7 +4,6 @@ const LOCAL_PENDING_KEY = 'mboa_pending_submissions';
 const LOCAL_LAST_RESPONSE_KEY = 'mboa_last_response';
 const LOCAL_SAVED_RESPONSES_KEY = 'mboa_saved_responses';
 const LOCAL_SHARED_RESPONSES_KEY = 'mboa_shared_responses';
-const HAS_VOTED_KEY = 'mboa_sondage_deja_fait';
 
 function getRecords(key) {
     return JSON.parse(localStorage.getItem(key) || '[]');
@@ -12,23 +11,6 @@ function getRecords(key) {
 
 function saveRecords(key, records) {
     localStorage.setItem(key, JSON.stringify(records));
-}
-
-function hasVoted() {
-    return localStorage.getItem(HAS_VOTED_KEY) === 'true';
-}
-
-function setVotedFlag() {
-    localStorage.setItem(HAS_VOTED_KEY, 'true');
-}
-
-function disableFormAfterSubmit(form) {
-    if (!form) return;
-    form.querySelectorAll('input, textarea, select, button').forEach(element => {
-        if (element.type !== 'button') {
-            element.disabled = true;
-        }
-    });
 }
 
 function makeLocalRecord(payload, source = 'local') {
@@ -54,12 +36,8 @@ function saveResponseLocally(payload) {
 
 function savePendingSubmission(payload) {
     saveResponseLocally(payload);
-    setVotedFlag();
     const pending = JSON.parse(localStorage.getItem(LOCAL_PENDING_KEY) || '[]');
-    const fingerprint = JSON.stringify(payload);
-    if (!pending.some(item => JSON.stringify(item.payload) === fingerprint)) {
-        pending.push({ payload, date: new Date().toISOString() });
-    }
+    pending.push({ payload, date: new Date().toISOString() });
     localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pending));
 }
 
@@ -84,33 +62,8 @@ function getSharedPayloads() {
     return getRecords(LOCAL_SHARED_RESPONSES_KEY).map(r => r.payload);
 }
 
-function getPendingPayloads() {
-    return JSON.parse(localStorage.getItem(LOCAL_PENDING_KEY) || '[]').map(item => item.payload || {});
-}
-
-function getLastPayload() {
-    const last = getLastResponse();
-    return last && last.payload ? [last.payload] : [];
-}
-
 function getLocalResponses() {
-    const responses = [
-        ...getSavedPayloads(),
-        ...getSharedPayloads(),
-        ...getPendingPayloads(),
-        ...getLastPayload()
-    ];
-    const seen = new Set();
-    return responses.filter(payload => {
-        try {
-            const key = JSON.stringify(payload);
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-        } catch (err) {
-            return true;
-        }
-    });
+    return [...getSavedPayloads(), ...getSharedPayloads()];
 }
 
 function normalizeImportedRecords(raw) {
@@ -206,7 +159,6 @@ function handleImportedFile(file) {
 function setupDashboardSharing() {
     const exportBtn = document.getElementById('export-data-btn');
     const importBtn = document.getElementById('import-data-btn');
-    const loadLocalBtn = document.getElementById('load-local-btn');
     const importInput = document.getElementById('import-file-input');
 
     if (exportBtn) {
@@ -221,9 +173,6 @@ function setupDashboardSharing() {
             }
             event.target.value = '';
         });
-    }
-    if (loadLocalBtn) {
-        loadLocalBtn.addEventListener('click', loadLocalDataNow);
     }
 }
 
@@ -267,29 +216,14 @@ function renderLocalResponse() {
     container.innerHTML = lines.length ? lines.join('') : '<p>Aucune réponse locale détaillée.</p>';
 }
 
-function loadLocalDataNow() {
-    const responses = getLocalResponses();
-    if (!responses.length) {
-        setShareStatus('Aucune donnée locale enregistrée sur ce téléphone.', true);
-        return;
+function getLocalResponses() {
+    const pending = JSON.parse(localStorage.getItem(LOCAL_PENDING_KEY) || '[]').map(item => item.payload || {});
+    const last = getLastResponse();
+    const current = [];
+    if (last && last.payload) {
+        current.push(last.payload);
     }
-    const offlineData = buildOfflineStats(responses);
-    renderCharts(offlineData);
-    setShareStatus(`Données locales chargées (${responses.length} réponse(s)).`);
-}
-
-function renderLocalCount() {
-    const localCount = getLocalResponses().length;
-    const status = document.getElementById('share-status');
-    if (status) {
-        if (localCount > 0) {
-            status.textContent = `Données locales détectées : ${localCount} réponse(s).`; 
-            status.style.color = '#555';
-        } else {
-            status.textContent = 'Aucune donnée locale détectée sur ce téléphone.';
-            status.style.color = '#555';
-        }
-    }
+    return [...current, ...pending];
 }
 
 function buildOfflineStats(responses) {
@@ -381,57 +315,6 @@ function buildOfflineStats(responses) {
             data: Object.values(repasFlemme)
         },
         odeurs_maison: odeursMaison.slice(0, 10)
-    };
-}
-
-function mergeSeries(remoteSeries, localSeries) {
-    const counts = {};
-    const palette = ['#E74C3C', '#F39C12', '#C0392B', '#D35400', '#F1C40F', '#3498DB', '#2ECC71', '#9B59B6', '#A569BD', '#5DADE2'];
-
-    if (remoteSeries && Array.isArray(remoteSeries.labels)) {
-        remoteSeries.labels.forEach((label, index) => {
-            counts[label] = (counts[label] || 0) + (remoteSeries.data[index] || 0);
-        });
-    }
-
-    if (localSeries && Array.isArray(localSeries.labels)) {
-        localSeries.labels.forEach((label, index) => {
-            counts[label] = (counts[label] || 0) + (localSeries.data[index] || 0);
-        });
-    }
-
-    const labels = Object.keys(counts);
-    return {
-        labels,
-        data: labels.map(label => counts[label]),
-        backgroundColor: labels.map((_, index) => palette[index % palette.length])
-    };
-}
-
-function getCombinedData(remoteData) {
-    const localResponses = getLocalResponses();
-    if (!localResponses.length) return remoteData;
-
-    const localData = buildOfflineStats(localResponses);
-    const totalRemote = remoteData.total_reponses || 0;
-    const totalLocal = localData.total_reponses || 0;
-    const remoteBudgetSum = (remoteData.budget_moyen || 0) * totalRemote;
-    const localBudgetSum = (localData.budget_moyen || 0) * totalLocal;
-    const total = totalRemote + totalLocal;
-    const budget_moyen = total ? Math.round(((remoteBudgetSum + localBudgetSum) / total) * 100) / 100 : 0;
-
-    return {
-        ...remoteData,
-        total_reponses: total,
-        budget_moyen,
-        odeurs: mergeSeries(remoteData.odeurs, localData.odeurs),
-        equipement: mergeSeries(remoteData.equipement, localData.equipement),
-        budget_detail: mergeSeries(remoteData.budget_detail, localData.budget_detail),
-        peurs: mergeSeries(remoteData.peurs, localData.peurs),
-        plats_saoulants: mergeSeries(remoteData.plats_saoulants, localData.plats_saoulants),
-        repas_flemme: mergeSeries(remoteData.repas_flemme, localData.repas_flemme),
-        odeurs_maison: [...new Set([...(remoteData.odeurs_maison || []), ...(localData.odeurs_maison || [])])].slice(0, 20),
-        _localCount: totalLocal
     };
 }
 
@@ -664,9 +547,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (response.status === 429) {
                     // IP bloquée
-                    setVotedFlag();
-                    disableFormAfterSubmit(form);
-                    submitBtn.textContent = ' Déjà soumis';
                     messageDiv.textContent = result.message;
                     messageDiv.style.color = '#E67E22';
                     return;
@@ -674,11 +554,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (response.ok) {
                     //  SUCCÈS
-                    setVotedFlag();
+                    localStorage.setItem(HAS_VOTED_KEY, 'true');
                     saveResponseLocally(payload);
                     saveLastResponse(payload, 'success');
-                    disableFormAfterSubmit(form);
-                    submitBtn.textContent = ' Soumission terminée';
                     messageDiv.textContent = ' Merci ! Ton profil est enregistré. Va voir le dashboard !';
                     messageDiv.style.color = '#27AE60';
                     form.reset();
@@ -690,18 +568,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } catch (error) {
                 console.error(' Erreur:', error);
-                setVotedFlag();
                 saveLastResponse(payload, 'pending');
                 savePendingSubmission(payload);
-                disableFormAfterSubmit(form);
-                submitBtn.textContent = ' En attente de renvoi';
-                messageDiv.textContent = 'Connexion impossible. Ta réponse est sauvegardée localement et ne pourra plus être envoyée une deuxième fois.';
+                messageDiv.textContent = 'Connexion impossible. Ta réponse est sauvegardée localement et sera renvoyée dès que possible.';
                 messageDiv.style.color = '#E74C3C';
             } finally {
-                if (!hasVoted()) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = ' Envoyer mon profil culinaire';
-                }
+                submitBtn.disabled = false;
+                submitBtn.textContent = ' Envoyer mon profil culinaire';
             }
         });
     }
@@ -722,8 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
         async function loadStats() {
             try {
                 const response = await fetch(API_STATS);
-                const serverData = await response.json();
-                const data = getCombinedData(serverData);
+                const data = await response.json();
                 
                 document.getElementById('total-reponses').textContent = data.total_reponses;
                 document.getElementById('budget-moyen').textContent = data.budget_moyen.toLocaleString();
@@ -734,11 +606,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.total_reponses > 0) {
                     if (data.plats_saoulants.labels.length) insights.push(` Plat le plus détesté : <strong>${data.plats_saoulants.labels[0]}</strong> (${data.plats_saoulants.data[0]} votes)`);
                     if (data.repas_flemme.labels.length) insights.push(` Flemme ultime = <strong>${data.repas_flemme.labels[0]}</strong>`);
-                    if (data._localCount) {
-                        insights.push(`Inclut ${data._localCount} réponse(s) locales + ${serverData.total_reponses} réponse(s) serveur`);
-                    }
                 } else {
-                    insights.push(" Aucune donnée. Remplis le questionnaire !");
+                    insights.push("📭 Aucune donnée. Remplis le questionnaire !");
                 }
                 box.innerHTML = insights.join('<br>');
                 
@@ -809,7 +678,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const dashboardElement = document.getElementById('insight-box');
         if (dashboardElement) {
             setupDashboardSharing();
-            renderLocalCount();
             loadStats();
             setInterval(loadStats, 30000);
         }
