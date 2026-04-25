@@ -5,7 +5,7 @@ import sqlite3
 import os
 from datetime import datetime, timedelta
 
-app = Flask(__name__, static_folder='../Frontend', static_url_path='')
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 # === INITIALISATION BASE DE DONNÉES ===
@@ -174,7 +174,7 @@ def serve_form():
 
 @app.route('/dashboard')
 def serve_dashboard():
-    return send_from_directory(app.static_folder, 'dashboard.html')
+    return send_from_directory('Frontend', 'dashboard.html')
 
 @app.route('/api/sondage', methods=['POST'])
 def recevoir_sondage():
