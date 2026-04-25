@@ -50,9 +50,121 @@ def init_db():
             c.execute(f'ALTER TABLE sondages ADD COLUMN {col}')
         except sqlite3.OperationalError:
             pass  # Colonne existe déjà
-    
+
+    # Insère 30 utilisateurs de démonstration si la table est vide
+    c.execute('SELECT COUNT(*) FROM sondages')
+    if c.fetchone()[0] == 0:
+        seed_sample_data(c)
+
     conn.commit()
     conn.close()
+
+# === DÉMO DONNÉES ===
+def seed_sample_data(c):
+    sample_responses = [
+        {
+            'equipement': ['plaque_unique', 'frigo'],
+            'frigo_vide': 1,
+            'repas_3_jours': 'Riz, poisson, salade',
+            'plat_saoulant': 'Riz blanc sans sauce',
+            'repas_flemme': 'Indomie',
+            'budget_max': 1000,
+            'ingredients_phares': 'Riz, Oignon, Tomate, Oeufs',
+            'plats_capable': 'Riz sauté, omelette',
+            'temps_max': 30,
+            'peur_cuisine': 'gachis',
+            'odeur_maison': 'Riz qui chauffe avec l’ail',
+            'odeur_preferee': 'oignon_ail',
+            'genie_choix': 'economique'
+        },
+        {
+            'equipement': ['micro_ondes'],
+            'frigo_vide': 3,
+            'repas_3_jours': 'Pain, soupe en sachet, omelette',
+            'plat_saoulant': 'Pâtes sans sauce',
+            'repas_flemme': 'Plat cuisiné micro-ondes',
+            'budget_max': 500,
+            'ingredients_phares': 'Pain, Oeufs, Beurre',
+            'plats_capable': 'Omelette, sandwich',
+            'temps_max': 15,
+            'peur_cuisine': 'temps',
+            'odeur_maison': 'Poisson braisé fumé',
+            'odeur_preferee': 'friture_poisson',
+            'genie_choix': 'rapide'
+        },
+        {
+            'equipement': ['frigo', 'micro_ondes'],
+            'frigo_vide': 2,
+            'repas_3_jours': 'Riz, haricots, viande grillée',
+            'plat_saoulant': 'Légumes sans goût',
+            'repas_flemme': 'Céréales',
+            'budget_max': 2000,
+            'ingredients_phares': 'Riz, Viande, Oignons',
+            'plats_capable': 'Riz cantonnais, salade',
+            'temps_max': 60,
+            'peur_cuisine': 'rater_cuisson',
+            'odeur_maison': 'Sauce arachide qui mijote',
+            'odeur_preferee': 'sauce_arachide',
+            'genie_choix': 'seduction'
+        },
+        {
+            'equipement': ['plaque_unique', 'congelateur'],
+            'frigo_vide': 4,
+            'repas_3_jours': 'Riz, poisson, banane',
+            'plat_saoulant': 'Semoule sèche',
+            'repas_flemme': 'Sardines-avocat',
+            'budget_max': 1500,
+            'ingredients_phares': 'Riz, Sardines, Oignons',
+            'plats_capable': 'Riz sauté, sauce tomate',
+            'temps_max': 30,
+            'peur_cuisine': 'vaisselle',
+            'odeur_maison': 'Oignon, ail qui sautent',
+            'odeur_preferee': 'oignon_ail',
+            'genie_choix': 'nostalgie'
+        },
+        {
+            'equipement': ['frigo', 'mixeur'],
+            'frigo_vide': 1,
+            'repas_3_jours': 'Pâtes, poulet, salade',
+            'plat_saoulant': 'Riz blanc sec',
+            'repas_flemme': 'Omelette + pain',
+            'budget_max': 1000,
+            'ingredients_phares': 'Pâtes, Oeufs, Tomate',
+            'plats_capable': 'Smoothie, salade',
+            'temps_max': 30,
+            'peur_cuisine': 'gachis',
+            'odeur_maison': 'Sauce tomate qui chauffe',
+            'odeur_preferee': 'viande_braisee',
+            'genie_choix': 'economique'
+        }
+    ]
+
+    ips = [f'192.168.0.{i}' for i in range(2, 32)]
+    for index in range(30):
+        sample = sample_responses[index % len(sample_responses)]
+        c.execute('''
+            INSERT INTO sondages 
+            (equipement, frigo_vide, repas_3_jours, plat_saoulant, repas_flemme,
+             budget_max, ingredients_phares, plats_capable, temps_max, peur_cuisine,
+             odeur_maison, odeur_preferee, genie_choix, ip_address, date_soumission)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            str(sample['equipement']),
+            sample['frigo_vide'],
+            sample['repas_3_jours'],
+            sample['plat_saoulant'],
+            sample['repas_flemme'],
+            sample['budget_max'],
+            sample['ingredients_phares'],
+            sample['plats_capable'],
+            sample['temps_max'],
+            sample['peur_cuisine'],
+            sample['odeur_maison'],
+            sample['odeur_preferee'],
+            sample['genie_choix'],
+            ips[index],
+            datetime.now() - timedelta(days=(30 - index))
+        ))
 
 # === ROUTES ===
 
