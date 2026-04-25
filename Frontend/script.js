@@ -2,8 +2,40 @@ const API_SONDAGE = '/api/sondage';
 const API_STATS = '/api/stats';
 const LOCAL_PENDING_KEY = 'mboa_pending_submissions';
 const LOCAL_LAST_RESPONSE_KEY = 'mboa_last_response';
+const LOCAL_SAVED_RESPONSES_KEY = 'mboa_saved_responses';
+const LOCAL_SHARED_RESPONSES_KEY = 'mboa_shared_responses';
+
+function getRecords(key) {
+    return JSON.parse(localStorage.getItem(key) || '[]');
+}
+
+function saveRecords(key, records) {
+    localStorage.setItem(key, JSON.stringify(records));
+}
+
+function makeLocalRecord(payload, source = 'local') {
+    const copy = { ...payload };
+    const id = copy.id || `${source}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    delete copy.id;
+    return {
+        id,
+        source,
+        date: new Date().toISOString(),
+        payload: copy
+    };
+}
+
+function saveResponseLocally(payload) {
+    const records = getRecords(LOCAL_SAVED_RESPONSES_KEY);
+    const record = makeLocalRecord(payload, 'local');
+    if (!records.some(r => r.id === record.id)) {
+        records.push(record);
+        saveRecords(LOCAL_SAVED_RESPONSES_KEY, records);
+    }
+}
 
 function savePendingSubmission(payload) {
+    saveResponseLocally(payload);
     const pending = JSON.parse(localStorage.getItem(LOCAL_PENDING_KEY) || '[]');
     pending.push({ payload, date: new Date().toISOString() });
     localStorage.setItem(LOCAL_PENDING_KEY, JSON.stringify(pending));
@@ -20,6 +52,128 @@ function saveLastResponse(payload, status = 'success') {
 
 function getLastResponse() {
     return JSON.parse(localStorage.getItem(LOCAL_LAST_RESPONSE_KEY) || 'null');
+}
+
+function getSavedPayloads() {
+    return getRecords(LOCAL_SAVED_RESPONSES_KEY).map(r => r.payload);
+}
+
+function getSharedPayloads() {
+    return getRecords(LOCAL_SHARED_RESPONSES_KEY).map(r => r.payload);
+}
+
+function getLocalResponses() {
+    return [...getSavedPayloads(), ...getSharedPayloads()];
+}
+
+function normalizeImportedRecords(raw) {
+    const imported = Array.isArray(raw) ? raw : raw.records || [];
+    return imported
+        .filter(item => item && (item.payload || typeof item === 'object'))
+        .map(item => {
+            const payload = item.payload ? { ...item.payload } : { ...item };
+            const id = item.id || `imported-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            delete payload.id;
+            return {
+                id,
+                source: 'imported',
+                date: item.date || new Date().toISOString(),
+                payload
+            };
+        });
+}
+
+function mergeImportedRecords(records) {
+    const existing = getRecords(LOCAL_SHARED_RESPONSES_KEY);
+    const merged = [...existing];
+    records.forEach(record => {
+        if (!merged.some(r => r.id === record.id)) {
+            merged.push(record);
+        }
+    });
+    saveRecords(LOCAL_SHARED_RESPONSES_KEY, merged);
+    return merged;
+}
+
+function downloadJSON(filename, data) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function getShareStatusElement() {
+    return document.getElementById('share-status');
+}
+
+function setShareStatus(message, isError = false) {
+    const el = getShareStatusElement();
+    if (!el) return;
+    el.textContent = message;
+    el.style.color = isError ? '#E74C3C' : '#27AE60';
+}
+
+function exportLocalData() {
+    const saved = getRecords(LOCAL_SAVED_RESPONSES_KEY);
+    const shared = getRecords(LOCAL_SHARED_RESPONSES_KEY);
+    const records = [...saved, ...shared];
+    if (!records.length) {
+        setShareStatus('Aucune donnée locale à exporter.', true);
+        return;
+    }
+    downloadJSON(
+        `mboa-collect-data-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`,
+        {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            records
+        }
+    );
+    setShareStatus('Fichier exporté. Partage-le avec d’autres téléphones.');
+}
+
+function handleImportedFile(file) {
+    const reader = new FileReader();
+    reader.onload = event => {
+        try {
+            const raw = JSON.parse(event.target.result);
+            const importedRecords = normalizeImportedRecords(raw);
+            if (!importedRecords.length) {
+                setShareStatus('Le fichier importé ne contient aucune donnée valide.', true);
+                return;
+            }
+            mergeImportedRecords(importedRecords);
+            loadStats();
+            setShareStatus(`${importedRecords.length} donnée(s) importée(s). Les graphiques ont été mis à jour.`);
+        } catch (err) {
+            console.error(err);
+            setShareStatus('Erreur à l’importation : fichier invalide.', true);
+        }
+    };
+    reader.readAsText(file);
+}
+
+function setupDashboardSharing() {
+    const exportBtn = document.getElementById('export-data-btn');
+    const importBtn = document.getElementById('import-data-btn');
+    const importInput = document.getElementById('import-file-input');
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', exportLocalData);
+    }
+    if (importBtn && importInput) {
+        importBtn.addEventListener('click', () => importInput.click());
+        importInput.addEventListener('change', event => {
+            const file = event.target.files[0];
+            if (file) {
+                handleImportedFile(file);
+            }
+            event.target.value = '';
+        });
+    }
 }
 
 function renderLocalResponse() {
@@ -401,6 +555,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (response.ok) {
                     //  SUCCÈS
                     localStorage.setItem(HAS_VOTED_KEY, 'true');
+                    saveResponseLocally(payload);
                     saveLastResponse(payload, 'success');
                     messageDiv.textContent = ' Merci ! Ton profil est enregistré. Va voir le dashboard !';
                     messageDiv.style.color = '#27AE60';
@@ -522,6 +677,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const dashboardElement = document.getElementById('insight-box');
         if (dashboardElement) {
+            setupDashboardSharing();
             loadStats();
             setInterval(loadStats, 30000);
         }

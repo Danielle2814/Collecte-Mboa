@@ -36,6 +36,16 @@
       <!-- Insights -->
       <div class="insight-box" id="insight-box">Chargement...</div>
 
+      <!-- Partage local des données -->
+      <div class="share-panel" style="margin: 20px 0; padding: 16px; border: 1px solid #ddd; border-radius: 12px; background: #fafafa;">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+          <button id="export-data-btn" style="padding: 10px 16px; border: none; border-radius: 8px; background: #3498DB; color: #fff; cursor: pointer;">Exporter mes données</button>
+          <button id="import-data-btn" style="padding: 10px 16px; border: none; border-radius: 8px; background: #2ECC71; color: #fff; cursor: pointer;">Importer des données</button>
+          <span id="share-status" style="font-size: 0.95rem; color: #555; flex: 1 1 100%;"></span>
+        </div>
+        <input type="file" id="import-file-input" accept="application/json" hidden />
+      </div>
+
       <!-- TOP 5 : Plats saoulants -->
       <div class="chart-card">
         <div class="chart-title">Top 5 "Plats qui sortent par les narines"</div>
